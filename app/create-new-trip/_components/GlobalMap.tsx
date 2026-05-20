@@ -3,7 +3,6 @@
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Activity, Itinerary } from "./ChatBox";
 import { useTripDetail } from "@/app/Provider";
 
 function GlobalMap() {
@@ -36,8 +35,8 @@ function GlobalMap() {
     const markers: mapboxgl.Marker[] = [];
 
     if (tripDetailInfo?.itinerary && mapRef.current) {
-      tripDetailInfo.itinerary.forEach((itinerary: Itinerary) => {
-        itinerary.activities.forEach((activity: Activity) => {
+      tripDetailInfo.itinerary.forEach((itinerary: any) => {
+        itinerary.activities.forEach((activity: any) => {
           const lat = activity?.geo_coordinates?.latitude;
           const lng = activity?.geo_coordinates?.longitude;
 
