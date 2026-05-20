@@ -119,7 +119,7 @@ function CreateNewTrip() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-ocean/3 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900">
-      <div className="max-w-screen-2xl mx-auto p-4 lg:p-6 pt-20 lg:pt-22">
+      <div className="max-w-screen-2xl mx-auto p-4 lg:p-6 pt-24 lg:pt-28">
         {/* Stage Progress Indicator */}
         <div className="mb-8">
           <div className="flex items-center justify-center">

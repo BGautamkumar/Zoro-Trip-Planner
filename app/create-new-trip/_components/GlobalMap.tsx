@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback, memo } from "react";
+import React, { useEffect, useRef, useState, memo } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useTripDetail } from "@/app/Provider";
 
@@ -8,6 +8,7 @@ function GlobalMapInner() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const [mapReady, setMapReady] = useState(false);
 
   const { tripDetailInfo } = useTripDetail();
 
@@ -29,6 +30,8 @@ function GlobalMapInner() {
           center: [0, 20],
           zoom: 1.5,
         });
+        // Signal that the map instance is ready for markers
+        setMapReady(true);
       }
     };
 
@@ -39,9 +42,9 @@ function GlobalMapInner() {
     };
   }, []);
 
-  // Update markers when trip data changes
+  // Update markers when trip data changes OR when map becomes ready
   useEffect(() => {
-    if (!tripDetailInfo?.itinerary || !mapRef.current) return;
+    if (!tripDetailInfo?.itinerary || !mapRef.current || !mapReady) return;
 
     let cancelled = false;
 
@@ -92,7 +95,7 @@ function GlobalMapInner() {
     return () => {
       cancelled = true;
     };
-  }, [tripDetailInfo]);
+  }, [tripDetailInfo, mapReady]);
 
   return (
     <div className="w-full h-full min-h-[400px]">
