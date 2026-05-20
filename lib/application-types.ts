@@ -143,16 +143,6 @@ export interface RouteValidationResult {
 
 // === API RESPONSE TYPES ===
 
-export interface AIModelResponse {
-  readonly resp: string;
-  readonly ui?: string;
-  readonly trip_plan?: any;
-  readonly metadata?: {
-    model: string;
-    tokens: number;
-    processingTime: number;
-  };
-}
 
 export interface APIError {
   readonly code: string;
@@ -219,7 +209,7 @@ export interface CreateTripResponse {
 // === TYPE GUARDS ===
 
 export function isValidMessage(obj: any): obj is ApplicationMessage {
-  return obj && 
+  return obj &&
     typeof obj === 'object' &&
     typeof obj.id === 'string' &&
     (obj.role === 'user' || obj.role === 'assistant') &&
