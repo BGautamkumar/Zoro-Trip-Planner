@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { Star, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Hotel } from './ChatBox';
 import { ValidatedHotel } from '@/lib/ai-data-validator';
 import axios from 'axios';
 
@@ -25,14 +24,14 @@ function HotelCardItem({ hotel }: Props) {
             const result = await axios.post('/api/google-place-detail', {
                 placeName: hotel?.hotel_name
             });
-            
+
             // Check for error response or invalid data
             if (result?.data?.error || !result?.data || typeof result.data !== 'string') {
                 console.warn('Failed to fetch hotel photo for:', hotel?.hotel_name);
                 setPhotoUrl('/placeholder.jpg'); // Use fallback immediately
                 return;
             }
-            
+
             setPhotoUrl(result.data);
         } catch (error) {
             console.error('Error fetching hotel photo:', error);
