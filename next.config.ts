@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
+  },
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@tabler/icons-react', 'motion'],
   },
 };
 

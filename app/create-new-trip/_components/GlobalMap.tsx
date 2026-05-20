@@ -1,46 +1,68 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
+import React, { useEffect, useRef, useCallback, memo } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useTripDetail } from "@/app/Provider";
 
-function GlobalMap() {
+function GlobalMapInner() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
 
-  // @ts-ignore
   const { tripDetailInfo } = useTripDetail();
 
+  // Initialize map once
   useEffect(() => {
-    const token = process.env.NEXT_PUBLIC_MAPBOX_API_KEY;
+    let cancelled = false;
 
-    if (!token) {
-      console.error("❌ Mapbox token missing");
-      return;
-    }
+    const initMap = async () => {
+      const mapboxgl = (await import('mapbox-gl')).default;
+      const token = process.env.NEXT_PUBLIC_MAPBOX_API_KEY;
 
-    // ✅ MUST be set BEFORE new Map()
-    mapboxgl.accessToken = token;
+      if (!token || cancelled) return;
+      mapboxgl.accessToken = token;
 
-    if (!mapRef.current && mapContainerRef.current) {
-      mapRef.current = new mapboxgl.Map({
-        container: mapContainerRef.current,
-        style: "mapbox://styles/mapbox/streets-v12",
-        center: [0, 20],
-        zoom: 1.5,
-      });
-    }
+      if (!mapRef.current && mapContainerRef.current) {
+        mapRef.current = new mapboxgl.Map({
+          container: mapContainerRef.current,
+          style: "mapbox://styles/mapbox/streets-v12",
+          center: [0, 20],
+          zoom: 1.5,
+        });
+      }
+    };
 
-    const markers: mapboxgl.Marker[] = [];
+    initMap();
 
-    if (tripDetailInfo?.itinerary && mapRef.current) {
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Update markers when trip data changes
+  useEffect(() => {
+    if (!tripDetailInfo?.itinerary || !mapRef.current) return;
+
+    let cancelled = false;
+
+    const updateMarkers = async () => {
+      const mapboxgl = (await import('mapbox-gl')).default;
+
+      if (cancelled) return;
+
+      // Clear old markers
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+
+      const bounds = new mapboxgl.LngLatBounds();
+      let hasValidCoords = false;
+
       tripDetailInfo.itinerary.forEach((itinerary: any) => {
-        itinerary.activities.forEach((activity: any) => {
+        (itinerary.activities || []).forEach((activity: any) => {
           const lat = activity?.geo_coordinates?.latitude;
           const lng = activity?.geo_coordinates?.longitude;
 
-          if (typeof lat === "number" && typeof lng === "number") {
+          if (typeof lat === "number" && typeof lng === "number" && (lat !== 0 || lng !== 0)) {
             const marker = new mapboxgl.Marker({ color: "red" })
               .setLngLat([lng, lat])
               .setPopup(
@@ -48,14 +70,27 @@ function GlobalMap() {
               )
               .addTo(mapRef.current!);
 
-            markers.push(marker);
+            markersRef.current.push(marker);
+            bounds.extend([lng, lat]);
+            hasValidCoords = true;
           }
         });
       });
-    }
+
+      // Auto-zoom to fit all markers
+      if (hasValidCoords && mapRef.current) {
+        mapRef.current.fitBounds(bounds, {
+          padding: 60,
+          maxZoom: 14,
+          duration: 1000,
+        });
+      }
+    };
+
+    updateMarkers();
 
     return () => {
-      markers.forEach((m) => m.remove());
+      cancelled = true;
     };
   }, [tripDetailInfo]);
 
@@ -69,5 +104,7 @@ function GlobalMap() {
     </div>
   );
 }
+
+const GlobalMap = memo(GlobalMapInner);
 
 export default GlobalMap;

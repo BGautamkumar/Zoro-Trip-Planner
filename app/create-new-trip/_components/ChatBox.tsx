@@ -15,7 +15,6 @@ import SelectDaysUi from './SelectDaysUi'
 import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { useTripDetail, useUserDetail } from '@/app/Provider'
-import { v4 as uuidv4 } from 'uuid';
 import { validateAITripData } from '@/lib/ai-data-validator';
 import { createTripViewPath, generateTripId } from '@/lib/routing-utils';
 import {
@@ -92,7 +91,7 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
         setLoading(true);
         setUserInput('');
         const newMsg: ApplicationMessage = {
-            id: uuidv4(),
+            id: crypto.randomUUID(),
             role: 'user',
             content: userInput,
             timestamp: Date.now()
@@ -108,7 +107,7 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
         console.log("TRIP", result.data);
 
         !isFinal && setMessages((prev: ApplicationMessage[]) => [...prev, {
-            id: uuidv4(), // Generate unique ID for assistant messages
+            id: crypto.randomUUID(), // Generate unique ID for assistant messages
             role: 'assistant',
             content: result?.data?.resp,
             ui: result?.data?.ui,

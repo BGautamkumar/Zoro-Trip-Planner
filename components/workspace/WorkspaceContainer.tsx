@@ -32,7 +32,6 @@ export function WorkspaceContainer({ className }: WorkspaceContainerProps) {
                           activeMode === "map";
     
     if (shouldAutoOpen) {
-      console.log('Auto-opening itinerary after trip generation');
       
       // Small delay to show transition
       const timer = setTimeout(() => {
@@ -49,7 +48,6 @@ export function WorkspaceContainer({ className }: WorkspaceContainerProps) {
   
   // User-driven tab change handler - respects user control after auto-open
   const handleModeChange = (newMode: WorkspaceMode) => {
-    console.log('User changed tab to:', newMode);
     setActiveMode(newMode);
   };
 

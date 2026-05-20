@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 
@@ -16,14 +14,10 @@ function Itinerary() {
   const tripContext = useTripDetail();
   const tripDetailInfo = tripContext?.tripDetailInfo;
 
-  const [tripData, setTripData] = useState<ValidatedTripInfo | null>(null);
-
-  useEffect(() => {
-    if (tripDetailInfo) {
-      // Validate and sanitize data before using
-      const validatedData = validateAITripData(tripDetailInfo);
-      setTripData(validatedData);
-    }
+  // useMemo avoids the extra render cycle of useEffect + useState
+  const tripData = useMemo<ValidatedTripInfo | null>(() => {
+    if (!tripDetailInfo) return null;
+    return validateAITripData(tripDetailInfo);
   }, [tripDetailInfo]);
 
   if (!tripData) {

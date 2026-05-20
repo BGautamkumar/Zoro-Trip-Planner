@@ -1,12 +1,9 @@
-import React, { Children, useContext } from 'react'
-import { createContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useRef, useMemo } from 'react'
 import { useUser } from '@clerk/nextjs';
 import { useMutation } from 'convex/react';
 import Header from './_components/Header'
-import Hero from './_components/Hero'
 import { api } from '@/convex/_generated/api';
 import { UserDetailContext } from '@/context/UserDetailContext';
-import { useComposedRefs } from 'motion/react';
 import { TripContextType, TripDetailContext } from '../context/TripDetailContext';
 import { ApplicationTrip } from '@/lib/application-types';
 
@@ -20,11 +17,15 @@ function Provider({
   const [userDetail, setUserDetail] = useState<any>();
   const [tripDetailInfo, setTripDetailInfo] = useState<ApplicationTrip | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const hasCreatedUser = useRef(false);
 
   const { user } = useUser();
 
   useEffect(() => {
-    user && CreateNewUser();
+    if (user && !hasCreatedUser.current) {
+      hasCreatedUser.current = true;
+      CreateNewUser();
+    }
   }, [user])
 
   const CreateNewUser = async () => {
@@ -38,9 +39,20 @@ function Provider({
       setUserDetail(result);
     }
   }
+
+  // Memoize context values to prevent cascading re-renders
+  const userContextValue = useMemo(() => ({
+    userDetail, setUserDetail
+  }), [userDetail]);
+
+  const tripContextValue = useMemo(() => ({
+    tripDetailInfo, setTripDetailInfo,
+    selectedLocation, setSelectedLocation
+  }), [tripDetailInfo, selectedLocation]);
+
   return (
-    <UserDetailContext.Provider value={{ userDetail, setUserDetail }}>
-      <TripDetailContext.Provider value={{ tripDetailInfo, setTripDetailInfo, selectedLocation, setSelectedLocation }}>
+    <UserDetailContext.Provider value={userContextValue}>
+      <TripDetailContext.Provider value={tripContextValue}>
         <div>
           <Header />
           {children}

@@ -17,6 +17,7 @@ export const metadata: Metadata = {
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
+  display: "swap",
 });
 
 export default function RootLayout({
@@ -30,9 +31,9 @@ export default function RootLayout({
         <body className={outfit.className} >
           <ConvexClientProvider>
             {children}
-            <Analytics />
-            <SpeedInsights />
           </ConvexClientProvider>
+          <Analytics />
+          <SpeedInsights />
         </body>
       </html>
     </ClerkProvider>
