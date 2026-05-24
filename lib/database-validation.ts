@@ -38,13 +38,22 @@ export const ActivityValidator = v.object({
   ticket_pricing: v.string(),
   time_travel_each_location: v.string(),
   best_time_to_visit: v.string(),
+  famous_features: v.optional(v.array(v.string())),
+  estimated_cost: v.optional(v.string()),
+  must_try_food: v.optional(v.array(v.string())),
 });
 
 export const ItineraryValidator = v.object({
   day: v.number(),
   day_plan: v.string(),
   best_time_to_visit_day: v.string(),
+  must_try_food: v.optional(v.array(v.string())),
+  local_transport: v.optional(v.string()),
+  travel_tips: v.optional(v.array(v.string())),
+  daily_food_budget: v.optional(v.string()),
+  daily_transport_budget: v.optional(v.string()),
   activities: v.array(ActivityValidator),
+  suggested_hotels: v.optional(v.array(HotelValidator)),
 });
 
 export const TripDetailValidator = v.object({

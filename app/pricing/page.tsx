@@ -1,5 +1,15 @@
 import { PricingTable } from "@clerk/nextjs"
 import { Sparkles } from "lucide-react"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Pricing",
+  description: "Choose your Zoro Trip Planner plan. Start free with AI-powered trip generation and upgrade for premium features.",
+  openGraph: {
+    title: "Pricing — Zoro Trip Planner",
+    description: "Start free and upgrade as your travel ambitions grow. AI-powered trip planning for everyone.",
+  },
+};
 
 function Pricing() {
     return (

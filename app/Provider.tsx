@@ -1,9 +1,10 @@
+"use client"
 import React, { useContext, useEffect, useState, useRef, useMemo } from 'react'
 import { useUser } from '@clerk/nextjs';
 import { useMutation } from 'convex/react';
 import Header from './_components/Header'
 import { api } from '@/convex/_generated/api';
-import { UserDetailContext } from '@/context/UserDetailContext';
+import { UserDetailContext, UserDetail } from '@/context/UserDetailContext';
 import { TripContextType, TripDetailContext } from '../context/TripDetailContext';
 import { ApplicationTrip } from '@/lib/application-types';
 
@@ -14,7 +15,7 @@ function Provider({
 }>) {
 
   const CreateUser = useMutation(api.user.CreateNewUser)
-  const [userDetail, setUserDetail] = useState<any>();
+  const [userDetail, setUserDetail] = useState<UserDetail | undefined>();
   const [tripDetailInfo, setTripDetailInfo] = useState<ApplicationTrip | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const hasCreatedUser = useRef(false);

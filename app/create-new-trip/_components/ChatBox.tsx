@@ -1,10 +1,9 @@
 "use client"
 
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Loader, Send } from 'lucide-react'
+import { Send, Loader2, Sparkles } from 'lucide-react'
 import axios from 'axios'
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import EmptyBoxState from './EmptyBoxState'
@@ -21,39 +20,46 @@ import {
     ApplicationMessage,
     ApplicationTrip,
     TripGenerationState,
-    TripGenerationStage,
     ChatBoxProps,
-    ViewMode,
-    AIModelRequest,
     AIModelResponse,
-    CreateTripRequest,
-    CreateTripResponse,
-    isValidMessage,
-    isValidTrip,
-    isTripGenerationState
 } from '@/lib/application-types';
-import { validateContract } from '@/lib/contracts';
 import {
-    UXState,
     createUXState,
-    categorizeError,
-    shouldRetry,
-    getRetryDelay
 } from '@/lib/ux-reliability';
 import { ReliableFeedback } from '@/components/ui/reliable-feedback';
+import { TravelModeSelector, getTravelModePromptHint, type TravelMode } from '@/components/trip/TravelModeSelector';
+
+// ── Typing indicator component ──
+function TypingIndicator() {
+    return (
+        <div className="flex items-start gap-3 mt-3">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-deep to-ocean flex items-center justify-center shrink-0 shadow-md">
+                <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <div className="bg-gray-100 dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-tl-sm">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 bg-ocean rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-ocean rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-ocean rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+            </div>
+        </div>
+    );
+}
 
 function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
-    // Production-grade state management with UX reliability
     const [messages, setMessages] = useState<ApplicationMessage[]>([]);
     const [userInput, setUserInput] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(false);
     const [isFinal, setIsFinal] = useState<boolean>(false);
-    const [tripDetail, setTripDetail] = useState<ApplicationTrip | null>(null);
     const [savedTripId, setSavedTripId] = useState<string>('');
     const [retryCount, setRetryCount] = useState<number>(0);
     const [operationStartTime, setOperationStartTime] = useState<number>(Date.now());
+    const [streamingText, setStreamingText] = useState<string>('');
+    const [travelMode, setTravelMode] = useState<TravelMode | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Production-grade state machine for trip generation flow
     const [generationState, setGenerationState] = useState<TripGenerationState>({
         stage: 'idle',
         tripId: null,
@@ -62,14 +68,11 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
         canNavigate: false
     });
 
-    // Create UX state for reliable feedback
     const uxState = useMemo(() => createUXState(generationState, generationState.error), [generationState, generationState.error]);
 
-    // Atomic state transition helper with type safety
     const updateGenerationState = useCallback((updates: Partial<TripGenerationState>) => {
         setGenerationState(prev => {
             const newState = { ...prev, ...updates };
-            // Ensure canNavigate is only true when save is confirmed
             if (newState.stage === 'saved' && newState.tripId && !newState.isProcessing) {
                 return { ...newState, canNavigate: true };
             }
@@ -78,154 +81,265 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
     }, []);
 
     const SaveTripDetail = useMutation(api.tripDetail.CreateTripDetail);
-    const { userDetail, setUserDetail } = useUserDetail();
+    const { userDetail } = useUserDetail();
     const router = useRouter();
-    const { tripDetailInfo, setTripDetailInfo } = useTripDetail();
+    const { setTripDetailInfo } = useTripDetail();
 
-    // Defensive navigation guard using production-grade state machine
     const canNavigateToTrip = generationState.canNavigate;
+
+    // Auto-scroll to bottom on new messages
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, loading, streamingText]);
+
+    // Auto-resize textarea
+    const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setUserInput(e.target.value);
+        const el = e.target;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    };
+
+    // Handle Enter key (without shift)
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            onSend();
+        }
+    };
+
+    /**
+     * Stream the final trip generation using SSE
+     */
+    const streamFinalGeneration = async (allMessages: ApplicationMessage[]) => {
+        onGenerationStart?.();
+
+        updateGenerationState({
+            stage: 'validating',
+            isProcessing: true,
+            error: null,
+            canNavigate: false
+        });
+
+        setStreamingText('');
+
+        try {
+            // Inject travel mode hint into messages for personalized generation
+            const messagesWithMode = travelMode
+                ? [
+                    ...allMessages,
+                    {
+                        id: 'travel-mode-context',
+                        role: 'user' as const,
+                        content: `[Travel Style: ${travelMode}. ${getTravelModePromptHint(travelMode)}]`,
+                        timestamp: Date.now()
+                    }
+                  ]
+                : allMessages;
+
+            const response = await fetch('/api/aimodel/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: messagesWithMode }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Stream request failed: ${response.status}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No response body');
+
+            const decoder = new TextDecoder();
+            let fullContent = '';
+            let parsedResult: any = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const text = decoder.decode(value, { stream: true });
+                const lines = text.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+
+                            if (data.chunk) {
+                                fullContent = data.partial || (fullContent + data.chunk);
+                                setStreamingText(fullContent);
+                            }
+
+                            if (data.done && data.result) {
+                                parsedResult = data.result;
+                            }
+                        } catch (parseErr: any) {
+                            if (parseErr.message && !parseErr.message.includes('JSON')) {
+                                throw parseErr;
+                            }
+                            // Ignore JSON parse errors in partial chunks
+                        }
+                    }
+                }
+            }
+
+            // If we didn't get a parsed result from the stream, try parsing fullContent
+            if (!parsedResult && fullContent) {
+                try {
+                    parsedResult = JSON.parse(fullContent);
+                } catch {
+                    throw new Error('Failed to parse AI response');
+                }
+            }
+
+            if (!parsedResult) {
+                throw new Error('No trip data received from AI');
+            }
+
+            // Validate and process
+            const validatedTripData = validateAITripData(parsedResult?.trip_plan || parsedResult);
+
+            if (!validatedTripData || !userDetail?._id) {
+                throw new Error('Invalid trip data or user not authenticated');
+            }
+
+            setTripDetailInfo(validatedTripData);
+
+            const tripId = generateTripId();
+
+            updateGenerationState({
+                stage: 'saving',
+                isProcessing: true,
+                error: null
+            });
+
+            const saveResult = await SaveTripDetail({
+                tripDetail: validatedTripData,
+                tripId: tripId,
+                uid: userDetail._id
+            });
+
+            if (!saveResult.success) {
+                throw new Error('Backend failed to confirm trip save');
+            }
+
+            updateGenerationState({
+                stage: 'saved',
+                tripId: tripId,
+                isProcessing: false,
+                error: null,
+                canNavigate: true
+            });
+
+            setSavedTripId(tripId);
+
+        } catch (error) {
+            console.error('Failed to generate/save trip:', error);
+            updateGenerationState({
+                stage: 'failed',
+                isProcessing: false,
+                error: error instanceof Error ? error.message : 'Failed to generate trip',
+                canNavigate: false
+            });
+        } finally {
+            setIsFinal(false);
+            setStreamingText('');
+        }
+    };
 
     const onSend = async () => {
         if (!userInput?.trim()) return;
 
         setLoading(true);
+        const currentInput = userInput;
         setUserInput('');
+
+        // Reset textarea height
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+        }
+
         const newMsg: ApplicationMessage = {
             id: crypto.randomUUID(),
             role: 'user',
-            content: userInput,
+            content: currentInput,
             timestamp: Date.now()
-        }
+        };
 
-        setMessages((prev: ApplicationMessage[]) => [...prev, newMsg]);
-
-        const result = await axios.post<AIModelResponse>('/api/aimodel', {
-            messages: [...messages, newMsg],
-            isFinal: isFinal
-        });
-
-        console.log("TRIP", result.data);
-
-        !isFinal && setMessages((prev: ApplicationMessage[]) => [...prev, {
-            id: crypto.randomUUID(), // Generate unique ID for assistant messages
-            role: 'assistant',
-            content: result?.data?.resp,
-            ui: result?.data?.ui,
-            timestamp: Date.now()
-        }]);
+        const newMessages = [...messages, newMsg];
+        setMessages(newMessages);
 
         if (isFinal) {
-            // Trigger generation start callback for UX flow
-            onGenerationStart?.();
-
-            // Start atomic generation flow
-            updateGenerationState({
-                stage: 'validating',
-                isProcessing: true,
-                error: null,
-                canNavigate: false
-            });
-
-            try {
-                // Validate and sanitize AI response
-                const validatedTripData = validateAITripData(result?.data?.trip_plan);
-
-                if (!validatedTripData || !userDetail?._id) {
-                    throw new Error('Invalid trip data or user not authenticated');
-                }
-
-                // Update local state first
-                setTripDetail(validatedTripData);
-                setTripDetailInfo(validatedTripData);
-
-                // Generate trip ID using production-grade utility
-                const tripId = generateTripId();
-
-                // Move to saving state
-                updateGenerationState({
-                    stage: 'saving',
-                    isProcessing: true,
-                    error: null
-                });
-
-                // Save to database with confirmation
-                const saveResult = await SaveTripDetail({
-                    tripDetail: validatedTripData,
-                    tripId: tripId,
-                    uid: userDetail._id
-                });
-
-                // Verify backend confirmed successful save
-                if (!saveResult.success) {
-                    throw new Error('Backend failed to confirm trip save');
-                }
-
-                // Atomic success state - all operations complete
-                updateGenerationState({
-                    stage: 'saved',
-                    tripId: tripId,
-                    isProcessing: false,
-                    error: null,
-                    canNavigate: true
-                });
-
-                // Update legacy state for compatibility
-                setSavedTripId(tripId);
-
-            } catch (error) {
-                console.error('Failed to save trip:', error);
-                updateGenerationState({
-                    stage: 'failed',
-                    isProcessing: false,
-                    error: error instanceof Error ? error.message : 'Failed to save trip',
-                    canNavigate: false
-                });
-            } finally {
-                setIsFinal(false);
-            }
-        }
-
-        setLoading(false);
-    }
-
-    const handleViewTrip = () => {
-        // Use new state machine for navigation guard
-        if (!generationState.canNavigate) {
-            console.error('Navigation not ready - trip not saved yet');
+            setLoading(false);
+            await streamFinalGeneration(newMessages);
             return;
         }
 
-        // Generate safe navigation path
+        try {
+            const result = await axios.post<AIModelResponse>('/api/aimodel', {
+                messages: newMessages,
+                isFinal: false
+            });
+
+            setMessages(prev => [...prev, {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: result?.data?.resp,
+                ui: result?.data?.ui,
+                timestamp: Date.now()
+            }]);
+        } catch (err) {
+            console.error('Chat error:', err);
+            setMessages(prev => [...prev, {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: 'Sorry, something went wrong. Please try again.',
+                timestamp: Date.now()
+            }]);
+        }
+
+        setLoading(false);
+    };
+
+    const handleViewTrip = () => {
+        if (!generationState.canNavigate) return;
+
         const navigationPath = createTripViewPath(generationState.tripId);
         if (navigationPath === '/create-new-trip') {
-            console.error('Invalid navigation path - falling back to safe route');
             router.push('/create-new-trip');
             return;
         }
 
-        // All checks passed - safe to navigate
         router.push(navigationPath);
     };
 
     const RenderGenerativeUi = (ui: string) => {
         if (ui == 'budget') {
-            //Budget UI Component
-            return <BudgetUi onSelectedOption={(v: string) => { setUserInput(v); onSend() }} />
+            return <BudgetUi onSelectedOption={(v: string) => { setUserInput(v); setTimeout(() => onSend(), 50) }} />
         } else if (ui == 'groupSize') {
-            //Group Size UI Component
-            return <GroupSizeUi onSelectedOption={(v: string) => { setUserInput(v); onSend() }} />
+            return <GroupSizeUi onSelectedOption={(v: string) => { setUserInput(v); setTimeout(() => onSend(), 50) }} />
         } else if (ui == 'tripDuration') {
-            //Select Days Ui Component
-            return <SelectDaysUi onSelectedOption={(v: string) => { setUserInput(v); onSend() }} />
+            return <SelectDaysUi onSelectedOption={(v: string) => { setUserInput(v); setTimeout(() => onSend(), 50) }} />
+        } else if (ui == 'travelMode') {
+            return <TravelModeSelector
+                selectedMode={travelMode}
+                onSelectMode={(mode) => {
+                    setTravelMode(mode);
+                    setUserInput(mode.charAt(0).toUpperCase() + mode.slice(1) + ' travel');
+                    setTimeout(() => onSend(), 100);
+                }}
+            />;
         } else if (ui == 'final') {
-            //Final Ui Component - Show production-grade reliable feedback
             return <ReliableFeedback
                 uxState={uxState}
                 onRetry={() => {
                     setRetryCount(prev => prev + 1);
-                    // Reset operation start time for retry
                     setOperationStartTime(Date.now());
-                    // Retry the entire operation
                     onSend();
                 }}
                 onAction={handleViewTrip}
@@ -247,10 +361,10 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
         }
     }, [messages])
 
-    // In completed mode, show summary instead of full chat
+    // ── Completed view mode ──
     if (viewMode === 'completed') {
         return (
-            <div className='flex flex-col border shadow rounded-2xl p-4 min-h-[400px]'>
+            <div className='flex flex-col border shadow-sm rounded-2xl p-5 min-h-[400px] bg-white dark:bg-gray-900'>
                 <div className="flex-1 flex flex-col justify-center items-center text-center space-y-4">
                     <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                         <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -269,10 +383,10 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
                                 onClick={handleViewTrip}
                                 disabled={!canNavigateToTrip}
                                 className={cn(
-                                    "mt-4 font-medium py-2 px-6 rounded-lg transition-colors",
+                                    "mt-4 font-medium py-2.5 px-6 rounded-xl transition-all duration-300",
                                     canNavigateToTrip
-                                        ? "bg-green-600 hover:bg-green-700 text-white"
-                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                        ? "bg-gradient-to-r from-deep to-ocean hover:from-deep-light hover:to-ocean-light text-white shadow-lg shadow-ocean/25 hover:shadow-xl hover:-translate-y-0.5"
+                                        : "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
                                 )}
                             >
                                 {canNavigateToTrip ? 'View Full Trip →' : 'Processing...'}
@@ -284,49 +398,96 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
         )
     }
 
+    // ── Main chat view ──
     return (
-        <div className='flex flex-col border shadow rounded-2xl p-4 min-h-[400px]'>
-            {/* Display Messages */}
-            <section className='flex-1 flex flex-col min-h-0 overflow-auto'>
+        <div className='flex flex-col min-h-[400px] max-h-[70vh]'>
+            {/* Messages Area */}
+            <section className='flex-1 overflow-y-auto px-4 py-4 space-y-1 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700'>
                 {messages?.length == 0 && (
                     <div className="flex-1 flex flex-col justify-between min-h-[300px]">
                         <EmptyBoxState
-                            onSelectOption={(v: string) => { setUserInput(v); onSend() }}
+                            onSelectOption={(v: string) => { setUserInput(v); setTimeout(() => onSend(), 50) }}
                         />
                     </div>
                 )}
+
                 {messages.map((msg: ApplicationMessage, index) => (
-                    msg.role == 'user' ?
-                        <div className='flex justify-end mt-2' key={index}>
-                            <div className='max-w-lg bg-primary text-white px-4 py-2 rounded-lg'>
-                                {msg.content}
-                            </div>
-                        </div> :
-                        <div className='flex justify-start mt-2' key={index}>
-                            <div className='max-w-lg bg-primary text-white px-4 py-2 rounded-lg'>
-                                {msg.content}
-                                {RenderGenerativeUi(msg.ui ?? '')}
+                    msg.role === 'user' ? (
+                        // ── User message: right-aligned, deep blue ──
+                        <div className='flex justify-end mt-3' key={msg.id || index}>
+                            <div className='max-w-[80%] sm:max-w-lg bg-gradient-to-r from-deep to-deep-light text-white px-4 py-3 rounded-2xl rounded-br-sm shadow-sm'>
+                                <p className="text-sm leading-relaxed">{msg.content}</p>
                             </div>
                         </div>
+                    ) : (
+                        // ── Assistant message: left-aligned, light bg, with avatar ──
+                        <div className='flex items-start gap-3 mt-3' key={msg.id || index}>
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-deep to-ocean flex items-center justify-center shrink-0 shadow-md">
+                                <Sparkles className="w-4 h-4 text-white" />
+                            </div>
+                            <div className='max-w-[80%] sm:max-w-lg'>
+                                <div className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
+                                    <p className="text-sm leading-relaxed">{msg.content}</p>
+                                </div>
+                                {msg.ui && (
+                                    <div className="mt-2">
+                                        {RenderGenerativeUi(msg.ui)}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
                 ))}
-                {loading && (
-                    <div className='flex justify-start mt-2'>
-                        <div className='max-w-lg bg-primary text-white px-4 py-2 rounded-lg'>
-                            <Loader className='animate-spin' />
+
+                {loading && <TypingIndicator />}
+
+                {/* Streaming progress indicator */}
+                {streamingText && (
+                    <div className="flex items-start gap-3 mt-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-deep to-ocean flex items-center justify-center shrink-0 shadow-md animate-pulse">
+                            <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="bg-ocean/5 dark:bg-ocean/10 border border-ocean/20 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%]">
+                            <div className="flex items-center gap-2 text-sm text-ocean font-medium">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Crafting your itinerary...</span>
+                            </div>
+                            <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-deep to-ocean rounded-full animate-pulse" style={{ width: '60%' }} />
+                            </div>
                         </div>
                     </div>
                 )}
+
+                <div ref={messagesEndRef} />
             </section>
-            {/* User Input */}
-            <section className="mt-auto">
-                <div className='w-full border rounded-2xl p-4 relative'>
-                    <Textarea placeholder='Start typing here...'
-                        className='w-full h-28 bg-transparent border-none focus-visible:ring-0 shadow-none resize-none'
-                        onChange={(event) => setUserInput(event.target.value)}
-                        value={userInput}
-                    />
-                    <Button size={'icon'} className='absolute bottom-6 right-6' onClick={() => onSend()}>
-                        <Send className='w-4 h-4' />
+
+            {/* Input Area */}
+            <section className="border-t border-gray-100 dark:border-gray-800 px-4 py-3 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+                <div className='flex items-end gap-3'>
+                    <div className="flex-1 relative">
+                        <textarea
+                            ref={textareaRef}
+                            placeholder='Type your message...'
+                            className='w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ocean/30 focus:border-ocean transition-all placeholder:text-gray-400'
+                            onChange={handleTextareaInput}
+                            onKeyDown={handleKeyDown}
+                            value={userInput}
+                            rows={1}
+                            style={{ minHeight: '44px', maxHeight: '120px' }}
+                        />
+                    </div>
+                    <Button
+                        size={'icon'}
+                        onClick={() => onSend()}
+                        disabled={!userInput?.trim() || loading}
+                        className="h-11 w-11 rounded-xl bg-gradient-to-r from-deep to-ocean hover:from-deep-light hover:to-ocean-light text-white shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    >
+                        {loading ? (
+                            <Loader2 className='w-4 h-4 animate-spin' />
+                        ) : (
+                            <Send className='w-4 h-4' />
+                        )}
                     </Button>
                 </div>
             </section>

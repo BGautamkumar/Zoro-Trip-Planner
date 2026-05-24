@@ -1,0 +1,8 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /sign-in/
+Disallow: /sign-up/
+
+Sitemap: https://zoro-trip-planner.vercel.app/sitemap.xml

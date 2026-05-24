@@ -1,0 +1,19 @@
+{
+  "name": "Zoro Trip Planner",
+  "short_name": "Zoro",
+  "description": "AI-powered travel planning. Craft personalized trip itineraries in seconds.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B1D3A",
+  "theme_color": "#1B9AAA",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo-v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["travel", "lifestyle", "productivity"]
+}

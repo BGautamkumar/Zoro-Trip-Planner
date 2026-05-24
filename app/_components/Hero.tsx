@@ -141,10 +141,12 @@ function Hero() {
                 <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="lg"
-                onClick={handleGetStarted}
-                className="rounded-full px-8 py-6 text-base font-semibold border-2 border-deep/15 text-deep hover:bg-deep/5 hover:border-deep/25 transition-all duration-300"
+                onClick={() => {
+                  document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+                }}
+                className="rounded-full px-8 py-6 text-base font-semibold text-deep/70 hover:text-deep hover:bg-deep/5 transition-all duration-300"
               >
                 See How It Works
               </Button>
@@ -169,7 +171,7 @@ function Hero() {
                   ))}
                   <span className="ml-1 font-semibold text-deep">4.9</span>
                 </div>
-                <span className="text-gray-500">Loved by 2,000+ travelers</span>
+                <span className="text-gray-500">Loved by 2,000+ trips planned</span>
               </div>
             </div>
           </div>

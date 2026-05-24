@@ -31,6 +31,11 @@ export interface ValidatedItinerary {
   day: number;
   day_plan: string;
   best_time_to_visit_day: string;
+  must_try_food?: string[];
+  local_transport?: string;
+  travel_tips?: string[];
+  daily_food_budget?: string;
+  daily_transport_budget?: string;
   activities: ValidatedActivity[];
   suggested_hotels: ValidatedHotel[];
 }
@@ -136,6 +141,21 @@ const sanitizeItinerary = (itinerary: any): ValidatedItinerary | null => {
     day: sanitizeNumber(itinerary.day, 1),
     day_plan: sanitizeString(itinerary.day_plan, 'Day Activities'),
     best_time_to_visit_day: sanitizeString(itinerary.best_time_to_visit_day, 'Any time'),
+    must_try_food: itinerary.must_try_food
+      ? sanitizeArray(itinerary.must_try_food, (food: any) => sanitizeString(food))
+      : undefined,
+    local_transport: itinerary.local_transport
+      ? sanitizeString(itinerary.local_transport)
+      : undefined,
+    travel_tips: itinerary.travel_tips
+      ? sanitizeArray(itinerary.travel_tips, (tip: any) => sanitizeString(tip))
+      : undefined,
+    daily_food_budget: itinerary.daily_food_budget
+      ? sanitizeString(itinerary.daily_food_budget)
+      : undefined,
+    daily_transport_budget: itinerary.daily_transport_budget
+      ? sanitizeString(itinerary.daily_transport_budget)
+      : undefined,
     activities: sanitizeArray(itinerary.activities, sanitizeActivity),
     suggested_hotels: sanitizeArray(itinerary.suggested_hotels, sanitizeHotel)
   };

@@ -484,7 +484,7 @@ const data = [
   },
   {
     category: "India",
-    title: "Harbour Views – Opera House, Bondi Beach & Wildlife",
+    title: "Vibrant Culture – Taj Mahal, Beaches & Wildlife",
     src: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?q=80&w=1171&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWlfHx8fGVufDB8fHx8fA%3D%3D",
     content: <IndiaContent />,
   },

@@ -11,7 +11,6 @@ import { MessageSquareText, Cpu, Map } from "lucide-react";
 type ExperienceStage = 'chat' | 'generating' | 'exploring';
 
 function CreateNewTrip() {
-  // @ts-ignore
   const { tripDetailInfo, setTripDetailInfo } = useTripDetail();
   const [activeWorkspaceMode, setActiveWorkspaceMode] = useState<WorkspaceMode>("map");
   const [isMobileView, setIsMobileView] = useState(false);

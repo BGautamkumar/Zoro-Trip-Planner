@@ -4,33 +4,39 @@ import { Star, Quote } from 'lucide-react'
 
 const testimonials = [
   {
-    name: "Sarah Jenkins",
+    name: "Sarah J.",
+    initials: "SJ",
+    trip: "Tokyo → London",
     role: "Frequent Traveler",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop",
     quote: "Zoro turned 3 weeks of stressful spreadsheet planning into a 15-second joy. The itinerary was flawless, balancing famous sights with hidden local gems.",
-    rating: 5
+    rating: 5,
+    color: "from-ocean to-ocean-light",
   },
   {
-    name: "David Chen",
+    name: "David C.",
+    initials: "DC",
+    trip: "Bali → Singapore",
     role: "Digital Nomad",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop",
     quote: "As someone who travels full-time, this tool is indispensable. It understands pacing, budget constraints, and geographical routing better than any human agent I've used.",
-    rating: 5
+    rating: 5,
+    color: "from-deep to-ocean",
   },
   {
-    name: "Elena Rodriguez",
+    name: "Elena R.",
+    initials: "ER",
+    trip: "Rome → Barcelona",
     role: "Family Vacation Planner",
-    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop",
     quote: "Planning for a family of 5 usually ends in tears. Zoro crafted an itinerary that kept the kids entertained while still giving us parents the cultural experiences we wanted.",
-    rating: 5
+    rating: 5,
+    color: "from-purple-500 to-pink-400",
   }
 ];
 
 const stats = [
-  { value: "50,000+", label: "Trips Planned" },
+  { value: "10,000+", label: "Trips Planned" },
   { value: "120+", label: "Countries Covered" },
   { value: "4.9/5", label: "Average Rating" },
-  { value: "10x", label: "Faster Planning" }
+  { value: "~12s", label: "Avg. Plan Generation" }
 ];
 
 function Testimonials() {
@@ -85,17 +91,16 @@ function Testimonials() {
               </p>
               
               <div className="flex items-center gap-4 mt-auto">
-                <img 
-                  src={testimonial.image} 
-                  alt={testimonial.name} 
-                  className="w-12 h-12 rounded-full object-cover border-2 border-surface dark:border-gray-800"
-                />
+                {/* Avatar with initials instead of stock photos */}
+                <div className={`w-12 h-12 rounded-full bg-linear-to-br ${testimonial.color} flex items-center justify-center text-white text-sm font-bold shadow-lg`}>
+                  {testimonial.initials}
+                </div>
                 <div>
                   <h4 className="font-semibold text-deep dark:text-white">
                     {testimonial.name}
                   </h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {testimonial.role}
+                    {testimonial.role} · {testimonial.trip}
                   </p>
                 </div>
               </div>

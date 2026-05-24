@@ -46,16 +46,14 @@ function MyTripCardItem({ trip, onDelete }: Props) {
       console.log(`🖼️ Fetching image for: ${destination}`);
       
       try {
-        const response = await axios.get('/api/fetch-image', {
-          params: {
-            location: destination,
-            type: 'place',
-          },
+        const response = await axios.post('/api/images/batch', {
+          places: [destination],
+        }, {
           timeout: 10000,
         });
 
-        if (response.data?.imageUrl) {
-          setImageUrl(response.data.imageUrl);
+        if (response.data?.[destination]) {
+          setImageUrl(response.data[destination]);
           console.log(`✅ Trip card image fetched for ${destination}`);
         } else {
           // Use fallback if API returns no image

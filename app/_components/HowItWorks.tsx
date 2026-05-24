@@ -31,7 +31,7 @@ function HowItWorks() {
   const { ref, isVisible } = useScrollReveal(0.1)
 
   return (
-    <section ref={ref} className="py-24 md:py-32 relative overflow-hidden">
+    <section id="how-it-works" ref={ref} className="py-24 md:py-32 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 -z-10 bg-white dark:bg-gray-900" />
 
