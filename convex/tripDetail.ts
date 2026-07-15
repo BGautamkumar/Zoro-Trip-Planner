@@ -7,11 +7,12 @@ export const CreateTripDetail = mutation({
     args: {
         tripId: v.string(),
         uid: v.id('UserTable'),
-        tripDetail: TripDetailValidator // 
+        tripDetail: TripDetailValidator
     },
     handler: async (ctx, args): Promise<CreateTripResponse> => {
         try {
             // Atomic database save with timestamps
+            // Note: ctx.db.insert() is atomic and throws on failure — no read-back needed
             const documentId = await ctx.db.insert('TripDetailTable', {
                 tripDetail: args.tripDetail,
                 tripId: args.tripId,
@@ -19,12 +20,6 @@ export const CreateTripDetail = mutation({
                 createdAt: Date.now(),
                 updatedAt: Date.now()
             });
-
-            // Verify save succeeded by reading back
-            const savedTrip = await ctx.db.get(documentId);
-            if (!savedTrip) {
-                throw new Error('Failed to verify trip was saved');
-            }
 
             return {
                 success: true,
@@ -37,6 +32,7 @@ export const CreateTripDetail = mutation({
         }
     }
 })
+
 
 export const GetUserTrips = query({
     args: {

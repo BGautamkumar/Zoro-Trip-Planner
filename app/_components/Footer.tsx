@@ -1,7 +1,7 @@
 import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Globe2, Twitter, Github, Instagram } from 'lucide-react'
+import { Globe2, Twitter, Github, Instagram, Linkedin } from 'lucide-react'
 
 const footerLinks = {
   product: [
@@ -15,16 +15,17 @@ const footerLinks = {
     { name: 'Careers', href: '/about-us' },
   ],
   legal: [
-    { name: 'Privacy Policy', href: '/privacy' },
-    { name: 'Terms of Service', href: '/terms' },
-    { name: 'Cookie Policy', href: '/cookies' },
+    { name: 'Privacy Policy', href: '/legal' },
+    { name: 'Terms of Service', href: '/legal' },
+    { name: 'Cookie Policy', href: '/legal' },
   ],
 }
 
 const socials = [
-  { icon: <Twitter className="h-4 w-4" />, href: '#', label: 'Twitter' },
-  { icon: <Github className="h-4 w-4" />, href: '#', label: 'GitHub' },
-  { icon: <Instagram className="h-4 w-4" />, href: '#', label: 'Instagram' },
+  { icon: <Linkedin className="h-4 w-4" />, href: 'https://www.linkedin.com/in/gautamkumarb7/', label: 'LinkedIn' },
+  { icon: <Twitter className="h-4 w-4" />, href: 'https://x.com/iamgautam67', label: 'Twitter' },
+  { icon: <Github className="h-4 w-4" />, href: 'https://github.com/BGautamkumar', label: 'GitHub' },
+  { icon: <Instagram className="h-4 w-4" />, href: 'https://www.instagram.com/nameisgautam_?igsh=MTVoNTI2NWliOWhtZA==', label: 'Instagram' },
 ]
 
 function Footer() {
@@ -53,6 +54,8 @@ function Footer() {
                   key={social.label}
                   href={social.href}
                   aria-label={social.label}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-ocean hover:border-ocean/30 hover:bg-ocean/10 transition-all duration-300"
                 >
                   {social.icon}

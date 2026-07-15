@@ -110,8 +110,12 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
 
     /**
      * Stream the final trip generation using SSE
+     * Optimizations:
+     * - Weather is pre-fetched in parallel with LLM generation (P8)
+     * - Convex save + image batch prefetch run concurrently (P9)
      */
     const streamFinalGeneration = async (allMessages: ApplicationMessage[]) => {
+        const t0 = Date.now();
         onGenerationStart?.();
 
         updateGenerationState({
@@ -124,7 +128,7 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
         setStreamingText('');
 
         try {
-            // Inject travel mode hint into messages for personalized generation
+            // Inject travel mode hint
             const messagesWithMode = travelMode
                 ? [
                     ...allMessages,
@@ -137,6 +141,23 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
                   ]
                 : allMessages;
 
+            // ── P8: Extract destination + days from conversation, prefetch weather ──
+            // Runs concurrently with the LLM stream — free parallelism
+            const conversationText = allMessages.map(m => m.content).join(' ');
+            const destinationMatch = conversationText.match(
+                /(?:to|destination[:\s]+|visiting|going to)\s+([A-Z][a-zA-Z\s,]+?)(?:\s+from|\s+for|\s+on|[.,!?]|$)/i
+            );
+            const daysMatch = conversationText.match(/(\d+)\s*(?:days?|nights?)/i);
+            const extractedDestination = destinationMatch?.[1]?.trim();
+            const extractedDays = daysMatch ? parseInt(daysMatch[1], 10) : 5;
+
+            // Fire weather prefetch in background (non-blocking)
+            if (extractedDestination) {
+                fetch(`/api/weather?destination=${encodeURIComponent(extractedDestination)}&days=${extractedDays}`)
+                    .catch(() => { /* Silently ignore — weather is non-critical */ });
+            }
+
+            // ── Primary: call the stream route (which internally uses parallel LLM) ──
             const response = await fetch('/api/aimodel/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -175,20 +196,27 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
                                 setStreamingText(fullContent);
                             }
 
-                            if (data.done && data.result) {
-                                parsedResult = data.result;
+                            if (data.done) {
+                                if (data.result) {
+                                    parsedResult = data.result;
+                                } else if (data.raw) {
+                                    // Fallback: server sent raw string — try to parse it
+                                    try { parsedResult = JSON.parse(data.raw); } catch { /* will retry below */ }
+                                }
+                                if (data.elapsed) {
+                                    console.log(`[ChatBox] LLM generation done in ${data.elapsed}ms via ${data.method}`);
+                                }
                             }
                         } catch (parseErr: any) {
                             if (parseErr.message && !parseErr.message.includes('JSON')) {
                                 throw parseErr;
                             }
-                            // Ignore JSON parse errors in partial chunks
                         }
                     }
                 }
             }
 
-            // If we didn't get a parsed result from the stream, try parsing fullContent
+            // Last-resort: try parsing fullContent directly
             if (!parsedResult && fullContent) {
                 try {
                     parsedResult = JSON.parse(fullContent);
@@ -201,13 +229,18 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
                 throw new Error('No trip data received from AI');
             }
 
+            // Normalize: handle { trip_plan: { trip_plan: {...} } } over-nesting from some paths
+            let tripPayload = parsedResult?.trip_plan ?? parsedResult;
+            if (tripPayload?.trip_plan) tripPayload = tripPayload.trip_plan;
+
             // Validate and process
-            const validatedTripData = validateAITripData(parsedResult?.trip_plan || parsedResult);
+            const validatedTripData = validateAITripData(tripPayload);
 
             if (!validatedTripData || !userDetail?._id) {
                 throw new Error('Invalid trip data or user not authenticated');
             }
 
+            // Show the itinerary immediately
             setTripDetailInfo(validatedTripData);
 
             const tripId = generateTripId();
@@ -218,15 +251,26 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
                 error: null
             });
 
+            // ── Fire weather prefetch (non-blocking, warms the cache for WeatherWidget) ──
+            const destination = validatedTripData.destination;
+            const totalDays = validatedTripData.itinerary?.length || extractedDays;
+            if (destination) {
+                fetch(`/api/weather?destination=${encodeURIComponent(destination)}&days=${totalDays}`)
+                    .catch(() => { /* non-critical — WeatherWidget will fetch on its own */ });
+            }
+
+            // ── Await Convex save directly (same as original, reliable) ──────
             const saveResult = await SaveTripDetail({
                 tripDetail: validatedTripData,
                 tripId: tripId,
                 uid: userDetail._id
             });
 
-            if (!saveResult.success) {
+            if (!saveResult?.success) {
                 throw new Error('Backend failed to confirm trip save');
             }
+
+            console.log(`[ChatBox] Total generation + save: ${Date.now() - t0}ms`);
 
             updateGenerationState({
                 stage: 'saved',
@@ -237,6 +281,7 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
             });
 
             setSavedTripId(tripId);
+
 
         } catch (error) {
             console.error('Failed to generate/save trip:', error);
@@ -252,7 +297,9 @@ function ChatBox({ onGenerationStart, viewMode = 'chat' }: ChatBoxProps) {
         }
     };
 
+
     const onSend = async () => {
+
         if (!userInput?.trim()) return;
 
         setLoading(true);

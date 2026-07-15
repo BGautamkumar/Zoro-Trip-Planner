@@ -1,84 +1,119 @@
 "use client"
 import React, { useState } from 'react'
+import { motion } from 'motion/react'
+import { User, Heart, Home, Users } from 'lucide-react'
 
 export const SelectTravelesList = [
-{
-    id: 1,
-    title: 'Just Me',
-    desc: 'A solo traveler in exploration',
-    icon: '✈️',
-    people: '1'
-},
-{
-    id: 2,
-    title: 'A Couple',
-    desc: 'Two travelers in tandem',
-    icon: '🥂',
-    people: '2 People'
-},
-{
-    id: 3,
-    title: 'Family',
-    desc: 'A group of fun loving adventurers',
-    icon: '🏡',
-    people: '3 to 5 People'
-},
-{
-    id: 4,
-    title: 'Friends',
-    desc: 'A bunch of thrill-seekers',
-    icon: '⛵',
-    people: '5 to 10 People'
-},
+    {
+        id: 'solo',
+        title: 'Solo',
+        desc: 'Just me',
+        icon: <User className="w-5 h-5" />,
+        people: '1',
+        gradient: 'from-violet-500 to-purple-600',
+    },
+    {
+        id: 'couple',
+        title: 'Couple',
+        desc: '2 People',
+        icon: <Heart className="w-5 h-5" />,
+        people: '2 People',
+        gradient: 'from-rose-500 to-pink-600',
+    },
+    {
+        id: 'family',
+        title: 'Family',
+        desc: '3 to 5 People',
+        icon: <Home className="w-5 h-5" />,
+        people: '3 to 5 People',
+        gradient: 'from-emerald-500 to-teal-600',
+    },
+    {
+        id: 'group',
+        title: 'Large Group',
+        desc: '6+ People',
+        icon: <Users className="w-5 h-5" />,
+        people: '6+ People',
+        gradient: 'from-amber-500 to-orange-600',
+    },
 ]
 
-function GroupSizeUi ({onSelectedOption}:any) {
-  const [selectedOption, setSelectedOption] = useState<typeof SelectTravelesList[0] | null>(null);
+function GroupSizeUi({ onSelectedOption, compact = false }: any) {
+    const [selectedOption, setSelectedOption] = useState<typeof SelectTravelesList[0] | null>(null);
 
-  const handleOptionClick = (option: typeof SelectTravelesList[0]) => {
-    // Update temporary selection - allows reselection
-    setSelectedOption(option);
-  };
+    const handleOptionClick = (option: typeof SelectTravelesList[0]) => {
+        setSelectedOption(option);
+        onSelectedOption(option.title + ":" + option.people);
+    };
 
-  const handleConfirm = () => {
-    if (selectedOption) {
-      // Only commit after confirmation
-      onSelectedOption(selectedOption.title + ":" + selectedOption.people);
-    }
-  };
+    return (
+        <div className={compact ? 'space-y-2' : 'space-y-4'}>
+            {!compact && (
+                <div className="text-center">
+                    <h3 className="text-lg font-bold text-deep dark:text-white">
+                        How many people are in your group?
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        This helps us recommend suitable activities and accommodations.
+                    </p>
+                </div>
+            )}
 
-  return (
-    <div className='flex flex-col mt-1'>
-      <div className='grid grid-cols-2 md:grid-cols-4 gap-2 items-center'>
-        {SelectTravelesList.map((item, index) => (
-            <div 
-            key={index} 
-            className={`p-3 border rounded-2xl cursor-pointer transition-colors flex flex-col items-center text-center ${
-              selectedOption?.id === item.id 
-                ? 'border-primary bg-primary/10' 
-                : 'bg-black hover:border-primary'
-            }`}
-            onClick={() => handleOptionClick(item)}
-            >
-                <h2 className='text-2xl mb-1'>{item.icon}</h2>
-                <h2 className='text-sm font-medium'>{item.title}</h2>
-                <p className='text-xs text-gray-500'>{item.people}</p>
+            <div className={`grid ${compact ? 'grid-cols-4 gap-2' : 'grid-cols-2 sm:grid-cols-4 gap-3'}`}>
+                {SelectTravelesList.map((mode) => {
+                    const isSelected = selectedOption?.id === mode.id;
+                    return (
+                        <motion.button
+                            key={mode.id}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => handleOptionClick(mode)}
+                            className={`relative flex flex-col items-center ${compact ? 'p-2.5' : 'p-4'} rounded-xl border-2 transition-all duration-300 ${
+                                isSelected
+                                    ? 'border-ocean bg-ocean/5 dark:bg-ocean/10 shadow-lg shadow-ocean/15'
+                                    : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-md'
+                            }`}
+                        >
+                            {/* Selected indicator */}
+                            {isSelected && (
+                                <motion.div
+                                    layoutId="groupsize-indicator"
+                                    className="absolute -top-1 -right-1 w-5 h-5 bg-ocean rounded-full flex items-center justify-center shadow-md"
+                                    initial={false}
+                                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                >
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </motion.div>
+                            )}
+
+                            {/* Icon */}
+                            <div className={`${compact ? 'w-8 h-8' : 'w-11 h-11'} rounded-xl bg-gradient-to-br ${mode.gradient} flex items-center justify-center text-white shadow-sm ${
+                                isSelected ? 'shadow-md' : ''
+                            }`}>
+                                {mode.icon}
+                            </div>
+
+                            {/* Label */}
+                            <span className={`${compact ? 'text-[10px] mt-1' : 'text-xs mt-2'} font-semibold ${
+                                isSelected ? 'text-ocean' : 'text-gray-700 dark:text-gray-300'
+                            }`}>
+                                {mode.title}
+                            </span>
+
+                            {/* Subtitle */}
+                            {!compact && (
+                                <span className="text-[10px] text-gray-400 mt-0.5 text-center leading-tight">
+                                    {mode.desc}
+                                </span>
+                            )}
+                        </motion.button>
+                    );
+                })}
             </div>
-        ))}
-      </div>
-      
-      {selectedOption && (
-        <div className='mt-4 flex justify-center'>
-          <button
-            className='bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors'
-            onClick={handleConfirm}
-          >
-            Confirm {selectedOption.title}
-          </button>
         </div>
-      )}
-    </div>
-  )
+    );
 }
 
-export default GroupSizeUi
+export default GroupSizeUi;

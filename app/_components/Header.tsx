@@ -17,6 +17,10 @@ const menuOptions = [
     path: '/pricing'
   },
   {
+    name: 'Guide',
+    path: '/guide'
+  },
+  {
     name: 'About us',
     path: '/about-us'
   }
@@ -48,38 +52,39 @@ function Header() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled || !isLanding
-          ? 'bg-white/85 dark:bg-gray-950/85 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm'
-          : 'bg-transparent border-b border-transparent'
-      }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled || !isLanding
+        ? 'bg-white/85 dark:bg-gray-950/85 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm'
+        : 'bg-transparent border-b border-transparent'
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20 md:h-24">
+        <div className="flex justify-between items-center h-16 md:h-20">
 
           {/* ── Logo ── */}
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link href="/" className="flex items-center gap-2 group">
             <div className="relative">
               <Image
                 src="/logo-v2.png"
                 alt="Zoro Trip Planner"
-                width={52}
-                height={52}
+                width={40}
+                height={40}
                 className="transition-transform duration-300 group-hover:scale-110"
               />
             </div>
-            <span className="font-bold text-2xl md:text-3xl tracking-tight text-transparent bg-clip-text bg-linear-to-r from-deep to-ocean">
+            <span className="font-bold text-3xl md:text-4xl tracking-tight text-transparent bg-clip-text bg-linear-to-r from-deep to-ocean">
               Zoro
             </span>
           </Link>
 
           {/* ── Navigation ── */}
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-1">
             {menuOptions.map((menu) => (
               <Link key={menu.path} href={menu.path}>
                 <span
-                  className={`nav-link px-4 py-2 text-base md:text-lg font-semibold rounded-lg transition-colors duration-200 ${
-                    path === menu.path
+                  className={`nav-link px-3 py-1.5 text-lg md:text-xl font-semibold rounded-lg transition-colors duration-200 ${
+                    menu.name === 'Guide'
+                      ? 'text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300'
+                      : path === menu.path
                       ? 'text-deep dark:text-ocean'
                       : 'text-gray-600 dark:text-gray-400 hover:text-deep dark:hover:text-ocean'
                   }`}
@@ -91,32 +96,32 @@ function Header() {
           </nav>
 
           {/* ── Actions & Mobile Toggle ── */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <SignedOut>
               <SignInButton mode="modal">
                 <Button
                   variant="ghost"
-                  className="text-base font-semibold text-gray-700 dark:text-gray-300 hover:text-deep"
+                  className="text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-deep"
                 >
                   Sign in
                 </Button>
               </SignInButton>
               <SignInButton mode="modal">
-                <Button className="bg-linear-to-r from-deep to-ocean hover:from-deep-light hover:to-ocean-light text-white rounded-full px-6 py-5 text-base font-semibold shadow-lg shadow-ocean/20 hover:shadow-xl hover:shadow-ocean/30 transition-all duration-300 hover:-translate-y-0.5">
+                <Button className="bg-linear-to-r from-deep to-ocean hover:from-deep-light hover:to-ocean-light text-white rounded-full px-5 py-2.5 text-sm font-semibold shadow-lg shadow-ocean/20 hover:shadow-xl hover:shadow-ocean/30 transition-all duration-300 hover:-translate-y-0.5">
                   Get Started
-                  <ArrowRight className="ml-1 h-5 w-5" />
+                  <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </SignInButton>
             </SignedOut>
 
             <SignedIn>
               <Button
-                className="bg-linear-to-r from-deep to-ocean hover:from-deep-light hover:to-ocean-light text-white rounded-full px-6 py-5 text-base font-semibold shadow-lg shadow-ocean/20 hover:shadow-xl hover:shadow-ocean/30 transition-all duration-300 hover:-translate-y-0.5"
+                className="bg-linear-to-r from-deep to-ocean hover:from-deep-light hover:to-ocean-light text-white rounded-full px-5 py-2.5 text-sm font-semibold shadow-lg shadow-ocean/20 hover:shadow-xl hover:shadow-ocean/30 transition-all duration-300 hover:-translate-y-0.5"
                 asChild
               >
                 <Link href={'/create-new-trip?mode=create'}>
                   Create New Trip
-                  <ArrowRight className="ml-1 h-5 w-5" />
+                  <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
               </Button>
 
@@ -125,7 +130,7 @@ function Header() {
                 appearance={{
                   elements: {
                     userButtonBox: "flex items-center",
-                    avatarBox: "w-8 h-8",
+                    avatarBox: "w-12 h-12",
                   },
                 }}
               >
@@ -147,7 +152,7 @@ function Header() {
             </SignedIn>
 
             {/* Mobile Menu Toggle */}
-            <button 
+            <button
               className="md:hidden p-2 text-deep dark:text-white focus:outline-none"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle mobile menu"
@@ -160,13 +165,15 @@ function Header() {
 
       {/* ── Mobile Menu Overlay & Drawer ── */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-white/95 dark:bg-gray-950/95 backdrop-blur-3xl flex flex-col pt-24 px-6 animate-reveal-up">
+        <div className="md:hidden fixed inset-0 z-40 bg-white/95 dark:bg-gray-950/95 backdrop-blur-3xl flex flex-col pt-20 px-6 animate-reveal-up">
           <nav className="flex flex-col gap-6 text-center">
             {menuOptions.map((menu) => (
               <Link key={menu.path} href={menu.path} onClick={() => setIsMobileMenuOpen(false)}>
                 <span
                   className={`block text-2xl font-bold transition-colors duration-200 ${
-                    path === menu.path
+                    menu.name === 'Guide'
+                      ? 'text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300'
+                      : path === menu.path
                       ? 'text-ocean'
                       : 'text-deep dark:text-white hover:text-ocean'
                   }`}
@@ -177,9 +184,8 @@ function Header() {
             ))}
             <SignedIn>
               <Link href="/my-trips" onClick={() => setIsMobileMenuOpen(false)}>
-                <span className={`block text-2xl font-bold transition-colors duration-200 ${
-                  path === '/my-trips' ? 'text-ocean' : 'text-deep dark:text-white hover:text-ocean'
-                }`}>
+                <span className={`block text-2xl font-bold transition-colors duration-200 ${path === '/my-trips' ? 'text-ocean' : 'text-deep dark:text-white hover:text-ocean'
+                  }`}>
                   My Trips
                 </span>
               </Link>

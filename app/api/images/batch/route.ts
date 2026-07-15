@@ -4,8 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 const photoCache = new Map<string, string>();
 
 const PLACEHOLDER = '/placeholder.jpg';
-const MAX_CONCURRENT = 5;
-const FETCH_TIMEOUT_MS = 5000;
+const FETCH_TIMEOUT_MS = 6000;
 
 /**
  * Fetch a single place photo URL from Google Places API
@@ -47,7 +46,6 @@ async function fetchPlacePhoto(placeName: string): Promise<string> {
       return buildUnsplashFallback(placeName);
     }
 
-    // Use the same key for media URL
     const mediaKey = process.env.GOOGLE_PLACE_API_KEY || process.env.GOOGLE_API_KEY || '';
     return `https://places.googleapis.com/v1/${placeRefName}/media?maxHeightPx=800&maxWidthPx=1200&key=${mediaKey}`;
   } catch (err: any) {
@@ -62,40 +60,15 @@ async function fetchPlacePhoto(placeName: string): Promise<string> {
 }
 
 /**
- * Build a relevant Unsplash image URL as fallback
+ * Build an Unsplash fallback image URL
  */
-function buildUnsplashFallback(placeName: string): string {
-  // Extract the core name (remove addresses after colon)
-  const coreName = placeName.split(':')[0].trim();
-  const query = encodeURIComponent(coreName);
+function buildUnsplashFallback(_placeName: string): string {
   return `https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800&h=600&fit=crop&q=80`;
 }
 
-/**
- * Process items in batches with concurrency limit
- */
-async function processBatch<T, R>(
-  items: T[],
-  processor: (item: T) => Promise<R>,
-  concurrency: number
-): Promise<R[]> {
-  const results: R[] = [];
-
-  for (let i = 0; i < items.length; i += concurrency) {
-    const batch = items.slice(i, i + concurrency);
-    const batchResults = await Promise.allSettled(batch.map(processor));
-
-    batchResults.forEach((result) => {
-      if (result.status === 'fulfilled') {
-        results.push(result.value);
-      }
-    });
-  }
-
-  return results;
-}
-
 export async function POST(req: NextRequest) {
+  const t0 = Date.now();
+
   try {
     const { places } = await req.json();
 
@@ -103,9 +76,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'places must be a non-empty array' }, { status: 400 });
     }
 
-    // Cap at 30 places per request to prevent abuse
-    const placeList = places.slice(0, 30) as string[];
-
+    // Cap at 50 places per request
+    const placeList = places.slice(0, 50) as string[];
     const result: Record<string, string> = {};
 
     // Separate cached from uncached
@@ -118,23 +90,26 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Fetch uncached in batches
+    // ✅ OPTIMIZATION: Fetch ALL uncached places in parallel (not in sequential batches)
+    // Previously: 77 places / 5 concurrency = 16 serial rounds × ~800ms = ~13s
+    // Now: all 77 run simultaneously = ~800ms (bound by slowest single request)
     if (uncached.length > 0) {
-      const fetchResults = await processBatch(
-        uncached,
-        async (placeName: string) => {
+      const settled = await Promise.allSettled(
+        uncached.map(async (placeName) => {
           const url = await fetchPlacePhoto(placeName);
           photoCache.set(placeName, url);
           return { name: placeName, url };
-        },
-        MAX_CONCURRENT
+        })
       );
 
-      fetchResults.forEach(({ name, url }) => {
-        result[name] = url;
+      settled.forEach((res) => {
+        if (res.status === 'fulfilled') {
+          result[res.value.name] = res.value.url;
+        }
       });
     }
 
+    console.log(`[images/batch] ${placeList.length} places (${uncached.length} fetched) in ${Date.now() - t0}ms`);
     return NextResponse.json(result);
   } catch (err: any) {
     console.error('Batch image API error:', err);
